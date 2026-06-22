@@ -740,6 +740,12 @@
   .erp-badge { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:3px; }
   .erp-badge.ok { background:#0a1f0a; color:var(--success); border:1px solid #1a3a1a; }
   @media (max-width:760px){ .erp-board{ grid-template-columns:1fr; } .erp-search{ width:100%; max-width:none; } }
+  .erp-col-add { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; padding:5px 11px; border-radius:3px; cursor:pointer; border:1px solid var(--accent); background:transparent; color:var(--accent); letter-spacing:.5px; }
+  .erp-col-add:hover { background:var(--accent); color:#000; }
+  .cd-field { margin-bottom:14px; position:relative; }
+  .cd-modal label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.5px; margin-bottom:6px; }
+  .cd-modal input { margin-bottom:0; font-size:13px; }
+  .cd-modal select { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; outline:none; }
 </style>
 </head>
 <body>
@@ -815,6 +821,29 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modalNewProject')">Cancelar</button>
       <button class="btn btn-primary" onclick="createProject()">Crear proyecto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal crear despacho (ERP) -->
+<div class="modal-overlay" id="modalCrearDespacho">
+  <div class="modal cd-modal">
+    <div class="modal-title">Crear despacho<button class="btn btn-ghost" onclick="closeModal('modalCrearDespacho')">✕</button></div>
+    <div class="cd-field">
+      <label>Elegir proyecto</label>
+      <input type="text" id="cdProySearch" placeholder="Buscar proyecto…" autocomplete="off"
+        oninput="filtrarProyDespacho()" onfocus="filtrarProyDespacho()"
+        onblur="setTimeout(()=>{const l=document.getElementById('cdProyList');if(l)l.style.display='none';},150)">
+      <div class="erp-search-list" id="cdProyList" style="display:none"></div>
+      <input type="hidden" id="cdProyOdf" value="">
+    </div>
+    <div class="cd-field"><label>Cliente</label><input type="text" id="cdCliente" placeholder="Nombre del cliente"></div>
+    <div class="cd-field"><label>Mueble</label><select id="cdMueble" onchange="onMuebleDespacho()"><option value="">Seleccionar mueble…</option></select></div>
+    <div class="cd-field"><label>Nombre mueble</label><input type="text" id="cdNombre" placeholder="Descripción"></div>
+    <div class="cd-field"><label>Bultos</label><input type="number" id="cdBultos" min="1" value="1" style="width:120px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalCrearDespacho')">Cancelar</button>
+      <button class="btn btn-primary" onclick="crearDespacho()">Crear despacho</button>
     </div>
   </div>
 </div>
@@ -999,80 +1028,132 @@ async function loadOdfCatalog() {
   window._odfCatalog = (odfs || []).filter(o => !usados.has(o.odf_numero));
 }
 
-function filtrarOdf() {
-  const inp = document.getElementById('odfSearch');
-  const list = document.getElementById('odfList');
+function openCrearDespacho() {
+  document.getElementById('cdProySearch').value = '';
+  document.getElementById('cdProyOdf').value = '';
+  document.getElementById('cdCliente').value = '';
+  document.getElementById('cdNombre').value = '';
+  document.getElementById('cdBultos').value = '1';
+  document.getElementById('cdMueble').innerHTML = '<option value="">Seleccionar mueble…</option>';
+  loadOdfCatalog();
+  openModal('modalCrearDespacho');
+}
+
+function filtrarProyDespacho() {
+  const inp = document.getElementById('cdProySearch');
+  const list = document.getElementById('cdProyList');
   if (!inp || !list) return;
   const q = (inp.value || '').toLowerCase().trim();
   const lista = (window._odfCatalog || []).filter(o =>
     [o.odf_numero, o.cliente].join(' ').toLowerCase().includes(q)).slice(0, 8);
   if (!lista.length) {
-    list.innerHTML = '<div class="erp-search-item" style="cursor:default;color:var(--muted)">Sin ODF para vincular</div>';
+    list.innerHTML = '<div class="erp-search-item" style="cursor:default;color:var(--muted)">Sin proyectos</div>';
   } else {
     list.innerHTML = lista.map(o => {
       const n = Array.isArray(o.muebles) ? o.muebles.length : 0;
-      return `<div class="erp-search-item" onmousedown="vincularOdf('${o.odf_numero}')"><span class="n">${o.odf_numero}</span> <span class="c">${o.cliente || ''}</span><span class="m">${n} muebles</span></div>`;
+      return `<div class="erp-search-item" onmousedown="selProyDespacho('${o.odf_numero}')"><span class="n">${o.odf_numero}</span> <span class="c">${o.cliente || ''}</span><span class="m">${n} muebles</span></div>`;
     }).join('');
   }
   list.style.display = 'block';
 }
 
-async function vincularOdf(odfNumero) {
+function selProyDespacho(odfNumero) {
   const o = (window._odfCatalog || []).find(x => x.odf_numero === odfNumero);
-  if (!o) return showToast('ODF no encontrado', 'error');
+  if (!o) return;
+  document.getElementById('cdProyOdf').value = odfNumero;
+  document.getElementById('cdProySearch').value = o.odf_numero + (o.cliente ? ' · ' + o.cliente : '');
+  document.getElementById('cdProyList').style.display = 'none';
+  document.getElementById('cdCliente').value = o.cliente || '';
+  const muebles = Array.isArray(o.muebles) ? o.muebles : [];
+  document.getElementById('cdMueble').innerHTML = '<option value="">Seleccionar mueble…</option>' +
+    muebles.map(m => `<option value="${m.id}">${(m.codigo ? m.codigo + ' · ' : '')}${(m.nombre || m.id)}</option>`).join('');
+}
+
+function onMuebleDespacho() {
+  const odf = document.getElementById('cdProyOdf').value;
+  const mfn = document.getElementById('cdMueble').value;
+  const o = (window._odfCatalog || []).find(x => x.odf_numero === odf);
+  const m = (o && Array.isArray(o.muebles)) ? o.muebles.find(x => String(x.id) === String(mfn)) : null;
+  if (m) document.getElementById('cdNombre').value = m.nombre || '';
+}
+
+async function crearDespacho() {
+  const odfNumero = document.getElementById('cdProyOdf').value;
+  const mfn = document.getElementById('cdMueble').value;
+  const nombreMueble = document.getElementById('cdNombre').value.trim();
+  const nBultos = Math.max(1, parseInt(document.getElementById('cdBultos').value, 10) || 1);
+  if (!odfNumero) return showToast('Elegí un proyecto', 'error');
+  if (!mfn) return showToast('Elegí un mueble', 'error');
+  const o = (window._odfCatalog || []).find(x => x.odf_numero === odfNumero);
+  if (!o) return showToast('Proyecto no encontrado', 'error');
+  const mueble = (Array.isArray(o.muebles) ? o.muebles : []).find(x => String(x.id) === String(mfn));
+  const codigo = (mueble && mueble.codigo) || '';
+  let proyId;
   const { data: ex } = await db.from('proyectos').select('id').eq('odf_numero', odfNumero).limit(1);
-  if (ex && ex.length) { await loadProjects(); return selectProject(ex[0].id); }
-  const nombre = `${o.odf_numero}${o.cliente ? ' · ' + o.cliente : ''}`;
-  const { data: proj, error } = await db.from('proyectos')
-    .insert({ nombre, descripcion: '', odf_numero: o.odf_numero, odf_proyecto_id: o.odf_proyecto_id })
-    .select().single();
-  if (error) return showToast('Error creando proyecto: ' + error.message, 'error');
-  const muebles = (Array.isArray(o.muebles) ? o.muebles : []).map(m => ({
-    proyecto_id: proj.id, mf_n: m.id, codigo: m.codigo || '', nombre: m.nombre || '',
-    cant: (m.cant != null && !isNaN(Number(m.cant))) ? Math.trunc(Number(m.cant)) : null,
-  }));
-  if (muebles.length) {
-    const { error: e2 } = await db.from('despacho_muebles').upsert(muebles, { onConflict: 'proyecto_id,mf_n', ignoreDuplicates: true });
-    if (e2) return showToast('Error seed muebles: ' + e2.message, 'error');
+  if (ex && ex.length) { proyId = ex[0].id; }
+  else {
+    const nombre = `${o.odf_numero}${o.cliente ? ' · ' + o.cliente : ''}`;
+    const { data: proj, error } = await db.from('proyectos')
+      .insert({ nombre, descripcion: '', odf_numero: o.odf_numero, odf_proyecto_id: o.odf_proyecto_id })
+      .select().single();
+    if (error) return showToast('Error creando proyecto: ' + error.message, 'error');
+    proyId = proj.id;
   }
-  showToast('ODF vinculado ✓', 'success');
+  const { data: dup } = await db.from('despacho_muebles').select('id').eq('proyecto_id', proyId).eq('mf_n', mfn).limit(1);
+  if (dup && dup.length) return showToast('Ese mueble ya está en el despacho', 'error');
+  const cant = (mueble && mueble.cant != null && !isNaN(Number(mueble.cant))) ? Math.trunc(Number(mueble.cant)) : null;
+  const { error: eM } = await db.from('despacho_muebles')
+    .insert({ proyecto_id: proyId, mf_n: mfn, codigo, nombre: nombreMueble || (mueble && mueble.nombre) || '', cant, impreso: false });
+  if (eM) return showToast('Error creando mueble: ' + eM.message, 'error');
+  const { data: maxRow } = await db.from('bultos').select('numero').eq('proyecto_id', proyId).order('numero', { ascending: false }).limit(1);
+  let next = (maxRow && maxRow.length ? (maxRow[0].numero || 0) : 0) + 1;
+  const bultos = [];
+  for (let i = 1; i <= nBultos; i++) {
+    bultos.push({ proyecto_id: proyId, numero: next++, mueble_mf_n: mfn, descripcion: `${codigo || mfn}-B${String(i).padStart(2, '0')}` });
+  }
+  const { error: eB } = await db.from('bultos').insert(bultos);
+  if (eB) return showToast('Error creando bultos: ' + eB.message, 'error');
+  closeModal('modalCrearDespacho');
+  showToast('Despacho creado ✓', 'success');
   await loadOdfCatalog();
   await loadProjects();
-  selectProject(proj.id);
+  selectProject(proyId);
 }
 
 async function loadErpDetail(id) {
   const { data: muebles, error } = await db.from('despacho_muebles').select('*').eq('proyecto_id', id).order('mf_n');
   if (error) return showToast('Error cargando muebles', 'error');
-  renderErp(currentProject, muebles || []);
+  const { data: bultos } = await db.from('bultos').select('mueble_mf_n, escaneado').eq('proyecto_id', id);
+  const byM = {};
+  (bultos || []).forEach(b => { const k = b.mueble_mf_n || ''; if (!byM[k]) byM[k] = { total: 0, scan: 0 }; byM[k].total++; if (b.escaneado) byM[k].scan++; });
+  renderErp(currentProject, (muebles || []).map(m => ({ ...m, _bultos: byM[m.mf_n] || { total: 0, scan: 0 } })));
 }
 
 function renderErp(p, muebles) {
   const esc = s => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
   const pend = muebles.filter(m => !m.impreso);
   const comp = muebles.filter(m => m.impreso);
-  const card = m => `<div class="erp-card">
+  const card = m => {
+    const b = m._bultos || { total: 0, scan: 0 };
+    const meta = b.total ? `${b.scan}/${b.total} bultos escaneados` : 'sin bultos asignados';
+    return `<div class="erp-card">
       <div class="erp-card-row"><span class="erp-card-code">${esc(m.codigo || m.mf_n)}</span>${m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : ''}</div>
       ${m.nombre ? `<div class="erp-card-nombre">${esc(m.nombre)}</div>` : ''}
-      <div class="erp-card-meta">sin bultos asignados</div>
+      <div class="erp-card-meta">${meta}</div>
     </div>`;
-  const col = (titulo, dot, arr) => `<div class="erp-col">
-      <div class="erp-col-header"><span class="erp-col-dot" style="background:${dot}"></span><span class="erp-col-title">${titulo}</span><span class="erp-col-count">${arr.length}</span></div>
+  };
+  const col = (titulo, dot, arr, addBtn) => `<div class="erp-col">
+      <div class="erp-col-header"><span class="erp-col-dot" style="background:${dot}"></span><span class="erp-col-title">${titulo}</span><span class="erp-col-count">${arr.length}</span>${addBtn ? '<button class="erp-col-add" onclick="openCrearDespacho()">+ Agregar</button>' : ''}</div>
       <div class="erp-col-body">${arr.length ? arr.map(card).join('') : '<div class="erp-col-empty">—</div>'}</div>
     </div>`;
   document.getElementById('content').innerHTML = `
     <div class="erp-topbar">
       <div class="erp-topbar-title">DESPACHO ERP${p ? ' · <b>' + esc(p.nombre) + '</b>' : ''}</div>
-      <div class="erp-search">
-        <input type="text" id="odfSearch" placeholder="Vincular ODF — buscar por número o cliente…" autocomplete="off"
-          oninput="filtrarOdf()" onfocus="filtrarOdf()" onblur="setTimeout(()=>{const l=document.getElementById('odfList');if(l)l.style.display='none';},150)">
-        <div class="erp-search-list" id="odfList" style="display:none"></div>
-      </div>
     </div>
     <div class="erp-board">
-      ${col('Pendiente', 'var(--muted)', pend)}
-      ${col('Completado', 'var(--success)', comp)}
-      ${col('Fuera', '#ff9d2e', [])}
+      ${col('Pendiente', 'var(--muted)', pend, true)}
+      ${col('Completado', 'var(--success)', comp, false)}
+      ${col('Fuera', '#ff9d2e', [], false)}
     </div>`;
 }
 
