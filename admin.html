@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0f0f0f;
@@ -711,11 +711,35 @@
   .mode-toggle { display:flex; gap:4px; background:var(--surface2); border-radius:8px; padding:3px; }
   .mode-btn { flex:1; padding:6px 10px; border:none; border-radius:6px; background:transparent; color:var(--muted); font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; }
   .mode-btn.active { background:var(--accent); color:#000; }
-  .odf-pick-card { padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
-  .odf-pick-card:hover { border-color:var(--accent); }
-  .odf-pick-num { font-family:'Space Mono',monospace; font-size:14px; color:var(--accent); }
-  .odf-pick-cli { font-size:13px; color:var(--text); margin-top:2px; }
-  .odf-pick-meta { font-size:11px; color:var(--muted); margin-top:4px; }
+  .erp-topbar { display:flex; align-items:center; gap:14px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .erp-topbar-title { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+  .erp-topbar-title b { color:var(--accent); }
+  .erp-search { position:relative; margin-left:auto; width:340px; max-width:55%; }
+  .erp-search input { width:100%; background:#111; border:1px solid #242424; border-radius:4px; padding:8px 11px; color:#ccc; font-size:12px; outline:none; font-family:'DM Sans',sans-serif; }
+  .erp-search input:focus { border-color:var(--accent); }
+  .erp-search-list { position:absolute; top:100%; left:0; right:0; z-index:100; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:4px; max-height:260px; overflow-y:auto; margin-top:2px; }
+  .erp-search-item { padding:9px 12px; font-size:12px; cursor:pointer; }
+  .erp-search-item:hover { background:#222; }
+  .erp-search-item .n { color:var(--accent); font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .erp-search-item .c { color:#ccc; }
+  .erp-search-item .m { color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:10px; margin-left:6px; }
+  .erp-board { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-top:14px; }
+  .erp-col { background:var(--bg); min-height:140px; display:flex; flex-direction:column; }
+  .erp-col-header { padding:12px 14px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border); }
+  .erp-col-dot { width:8px; height:8px; border-radius:50%; }
+  .erp-col-title { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; }
+  .erp-col-count { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; margin-left:auto; color:var(--muted); }
+  .erp-col-body { padding:10px 12px; }
+  .erp-col-empty { color:var(--muted); font-size:11px; text-align:center; padding:18px 0; }
+  .erp-card { background:#131313; border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin-bottom:8px; transition:border-color .15s; }
+  .erp-card:hover { border-color:#3a3a3a; }
+  .erp-card-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .erp-card-code { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--accent); }
+  .erp-card-nombre { font-size:12px; font-weight:600; color:#ccc; margin-bottom:6px; }
+  .erp-card-meta { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); }
+  .erp-badge { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:3px; }
+  .erp-badge.ok { background:#0a1f0a; color:var(--success); border:1px solid #1a3a1a; }
+  @media (max-width:760px){ .erp-board{ grid-template-columns:1fr; } .erp-search{ width:100%; max-width:none; } }
 </style>
 </head>
 <body>
@@ -728,7 +752,7 @@
   <div class="header-right">
     <button class="btn btn-secondary" onclick="openHistorial()" style="font-size:12px">📋 Historial</button>
     <button class="btn btn-primary" id="btnNuevoProyecto" onclick="openNewProject()">+ Nuevo proyecto</button>
-    <button class="btn btn-primary" id="btnVincularOdf" onclick="openVincularOdf()" style="display:none">+ Vincular ODF</button>
+
   </div>
 </header>
 
@@ -823,20 +847,6 @@
   </div>
 </div>
 
-<!-- Modal vincular ODF -->
-<div class="modal-overlay" id="modalVincularOdf">
-  <div class="modal" style="width:560px">
-    <div class="modal-title">
-      Vincular ODF
-      <button class="btn btn-ghost" onclick="closeModal('modalVincularOdf')">✕</button>
-    </div>
-    <input type="text" id="odfSearch" placeholder="Buscar por número o cliente..." oninput="renderOdfPicker(this.value)" style="margin-bottom:12px">
-    <div id="vincularContent" style="max-height:420px;overflow-y:auto"></div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modalVincularOdf')">Cerrar</button>
-    </div>
-  </div>
-</div>
 
 <!-- Print area -->
 <div class="print-preview" id="printArea"></div>
@@ -970,79 +980,48 @@ async function loadProjectDetail(id) {
   window._currentBultos = bultos;
 }
 
-// ════════ ERP MODE (Lote 3a) ════════
+// ════════ ERP MODE (UX tercerizados) ════════
 function setMode(m) {
   currentMode = m;
   document.getElementById('modeLogistica').classList.toggle('active', m === 'logistica');
   document.getElementById('modeErp').classList.toggle('active', m === 'erp');
   const nb = document.getElementById('btnNuevoProyecto'); if (nb) nb.style.display = m === 'erp' ? 'none' : '';
-  const vb = document.getElementById('btnVincularOdf'); if (vb) vb.style.display = m === 'erp' ? '' : 'none';
   currentProject = null;
-  document.getElementById('content').innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Seleccioná un ' + (m === 'erp' ? 'ODF' : 'proyecto') + '</div></div>';
+  if (m === 'erp') { loadOdfCatalog(); renderErp(null, []); }
+  else { document.getElementById('content').innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Seleccioná un proyecto</div></div>'; }
   loadProjects();
 }
 
-async function loadErpDetail(id) {
-  const content = document.getElementById('content');
-  content.innerHTML = '<div class="empty-state"><div class="loading"></div></div>';
-  const { data: muebles, error } = await db.from('despacho_muebles').select('*').eq('proyecto_id', id).order('mf_n');
-  if (error) return showToast('Error cargando muebles', 'error');
-  const p = currentProject;
-  const fecha = new Date(p.fecha_creacion).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' });
-  content.innerHTML = `
-    <div class="project-detail-header">
-      <div>
-        <div class="project-detail-name">${p.nombre}</div>
-        <div class="project-detail-date">${fecha} · ${muebles.length} muebles</div>
-      </div>
-    </div>
-    <div class="section-title">Muebles</div>
-    <div class="bulto-grid">
-      ${muebles.map(m => `
-        <div class="bulto-card">
-          <div class="bulto-num">${m.codigo || m.mf_n}</div>
-          ${m.nombre ? `<div class="bulto-desc">${m.nombre}</div>` : ''}
-          <div class="bulto-status">${m.impreso ? '✓ COMPLETADO' : '— PENDIENTE'}</div>
-        </div>`).join('')}
-    </div>
-    <div style="color:var(--muted);font-size:12px;margin-top:16px">Lote 3a: lista read-only. Asignación de bultos e impresión llegan en 3b.</div>
-  `;
-}
-
-async function openVincularOdf() {
-  const cont = document.getElementById('vincularContent');
-  document.getElementById('odfSearch').value = '';
-  cont.innerHTML = '<div class="empty-state"><div class="loading"></div></div>';
-  openModal('modalVincularOdf');
+async function loadOdfCatalog() {
   const { data: links } = await db.from('proyectos').select('odf_numero').not('odf_numero', 'is', null);
   const usados = new Set((links || []).map(l => l.odf_numero));
-  const { data: odfs, error } = await db.from('odf_disponibles').select('*').eq('activo', true).order('odf_numero', { ascending: false });
-  if (error) { cont.innerHTML = '<div class="no-projects">Error cargando ODF</div>'; return; }
-  window._odfDisponibles = (odfs || []).filter(o => !usados.has(o.odf_numero));
-  renderOdfPicker('');
+  const { data: odfs } = await db.from('odf_disponibles').select('*').eq('activo', true).order('odf_numero', { ascending: false });
+  window._odfCatalog = (odfs || []).filter(o => !usados.has(o.odf_numero));
 }
 
-function renderOdfPicker(filtro) {
-  const cont = document.getElementById('vincularContent');
-  const f = (filtro || '').toLowerCase().trim();
-  const lista = (window._odfDisponibles || []).filter(o =>
-    !f || (o.odf_numero || '').toLowerCase().includes(f) || (o.cliente || '').toLowerCase().includes(f));
-  if (!lista.length) { cont.innerHTML = '<div class="no-projects">Sin ODF para vincular</div>'; return; }
-  cont.innerHTML = lista.map(o => {
-    const n = Array.isArray(o.muebles) ? o.muebles.length : 0;
-    return `<div class="odf-pick-card" onclick="vincularOdf('${o.odf_numero}')">
-      <div class="odf-pick-num">${o.odf_numero}</div>
-      ${o.cliente ? `<div class="odf-pick-cli">${o.cliente}</div>` : ''}
-      <div class="odf-pick-meta">${n} muebles</div>
-    </div>`;
-  }).join('');
+function filtrarOdf() {
+  const inp = document.getElementById('odfSearch');
+  const list = document.getElementById('odfList');
+  if (!inp || !list) return;
+  const q = (inp.value || '').toLowerCase().trim();
+  const lista = (window._odfCatalog || []).filter(o =>
+    [o.odf_numero, o.cliente].join(' ').toLowerCase().includes(q)).slice(0, 8);
+  if (!lista.length) {
+    list.innerHTML = '<div class="erp-search-item" style="cursor:default;color:var(--muted)">Sin ODF para vincular</div>';
+  } else {
+    list.innerHTML = lista.map(o => {
+      const n = Array.isArray(o.muebles) ? o.muebles.length : 0;
+      return `<div class="erp-search-item" onmousedown="vincularOdf('${o.odf_numero}')"><span class="n">${o.odf_numero}</span> <span class="c">${o.cliente || ''}</span><span class="m">${n} muebles</span></div>`;
+    }).join('');
+  }
+  list.style.display = 'block';
 }
 
 async function vincularOdf(odfNumero) {
-  const o = (window._odfDisponibles || []).find(x => x.odf_numero === odfNumero);
+  const o = (window._odfCatalog || []).find(x => x.odf_numero === odfNumero);
   if (!o) return showToast('ODF no encontrado', 'error');
   const { data: ex } = await db.from('proyectos').select('id').eq('odf_numero', odfNumero).limit(1);
-  if (ex && ex.length) { closeModal('modalVincularOdf'); await loadProjects(); return selectProject(ex[0].id); }
+  if (ex && ex.length) { await loadProjects(); return selectProject(ex[0].id); }
   const nombre = `${o.odf_numero}${o.cliente ? ' · ' + o.cliente : ''}`;
   const { data: proj, error } = await db.from('proyectos')
     .insert({ nombre, descripcion: '', odf_numero: o.odf_numero, odf_proyecto_id: o.odf_proyecto_id })
@@ -1053,14 +1032,48 @@ async function vincularOdf(odfNumero) {
     cant: (m.cant != null && !isNaN(Number(m.cant))) ? Math.trunc(Number(m.cant)) : null,
   }));
   if (muebles.length) {
-    const { error: e2 } = await db.from('despacho_muebles')
-      .upsert(muebles, { onConflict: 'proyecto_id,mf_n', ignoreDuplicates: true });
+    const { error: e2 } = await db.from('despacho_muebles').upsert(muebles, { onConflict: 'proyecto_id,mf_n', ignoreDuplicates: true });
     if (e2) return showToast('Error seed muebles: ' + e2.message, 'error');
   }
-  closeModal('modalVincularOdf');
   showToast('ODF vinculado ✓', 'success');
+  await loadOdfCatalog();
   await loadProjects();
   selectProject(proj.id);
+}
+
+async function loadErpDetail(id) {
+  const { data: muebles, error } = await db.from('despacho_muebles').select('*').eq('proyecto_id', id).order('mf_n');
+  if (error) return showToast('Error cargando muebles', 'error');
+  renderErp(currentProject, muebles || []);
+}
+
+function renderErp(p, muebles) {
+  const esc = s => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+  const pend = muebles.filter(m => !m.impreso);
+  const comp = muebles.filter(m => m.impreso);
+  const card = m => `<div class="erp-card">
+      <div class="erp-card-row"><span class="erp-card-code">${esc(m.codigo || m.mf_n)}</span>${m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : ''}</div>
+      ${m.nombre ? `<div class="erp-card-nombre">${esc(m.nombre)}</div>` : ''}
+      <div class="erp-card-meta">sin bultos asignados</div>
+    </div>`;
+  const col = (titulo, dot, arr) => `<div class="erp-col">
+      <div class="erp-col-header"><span class="erp-col-dot" style="background:${dot}"></span><span class="erp-col-title">${titulo}</span><span class="erp-col-count">${arr.length}</span></div>
+      <div class="erp-col-body">${arr.length ? arr.map(card).join('') : '<div class="erp-col-empty">—</div>'}</div>
+    </div>`;
+  document.getElementById('content').innerHTML = `
+    <div class="erp-topbar">
+      <div class="erp-topbar-title">DESPACHO ERP${p ? ' · <b>' + esc(p.nombre) + '</b>' : ''}</div>
+      <div class="erp-search">
+        <input type="text" id="odfSearch" placeholder="Vincular ODF — buscar por número o cliente…" autocomplete="off"
+          oninput="filtrarOdf()" onfocus="filtrarOdf()" onblur="setTimeout(()=>{const l=document.getElementById('odfList');if(l)l.style.display='none';},150)">
+        <div class="erp-search-list" id="odfList" style="display:none"></div>
+      </div>
+    </div>
+    <div class="erp-board">
+      ${col('Pendiente', 'var(--muted)', pend)}
+      ${col('Completado', 'var(--success)', comp)}
+      ${col('Fuera', '#ff9d2e', [])}
+    </div>`;
 }
 
 // ---- Create project ----
