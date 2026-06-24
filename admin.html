@@ -739,6 +739,32 @@
   .erp-card-meta { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); }
   .erp-badge { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:3px; }
   .erp-badge.ok { background:#0a1f0a; color:var(--success); border:1px solid #1a3a1a; }
+  .erp-badge.out { background:#1a1200; color:#ff9d2e; border:1px solid #3a2a00; }
+  .erp-badge.pend { background:#161616; color:var(--muted); border:1px solid var(--border2); }
+  .erp-card { cursor:pointer; }
+  .erp-card:hover { border-color:var(--accent); }
+  .md-code { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--accent); }
+  .md-name { font-size:18px; font-weight:700; color:#fff; margin-top:3px; }
+  .md-sub { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); margin-top:5px; display:flex; align-items:center; gap:8px; }
+  .md-actions { display:flex; gap:7px; flex-wrap:wrap; margin:16px 0 18px; }
+  .md-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:8px; }
+  .md-stat { text-align:center; }
+  .md-stat-v { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; }
+  .md-stat-l { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-top:3px; }
+  .md-track { height:6px; background:#1a1a1a; border-radius:3px; overflow:hidden; margin-bottom:6px; }
+  .md-fill { height:100%; background:var(--accent); }
+  .md-bultos { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+  .md-bcard { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:12px; text-align:center; }
+  .md-bcard.scanned { border-color:#1a3a1a; background:#0a1606; }
+  .md-bnum { font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--accent); }
+  .md-bdesc { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted); margin-top:3px; }
+  .md-bstatus { font-family:'JetBrains Mono',monospace; font-size:9px; margin-top:7px; }
+  .md-bcard.scanned .md-bstatus { color:var(--success); }
+  .md-bcard:not(.scanned) .md-bstatus { color:var(--muted); }
+  .md-bmark { font-family:'JetBrains Mono',monospace; font-size:9px; padding:4px 9px; border-radius:3px; cursor:pointer; border:1px solid var(--border2); background:transparent; color:var(--text); margin-top:7px; }
+  .md-bmark:hover { border-color:var(--accent); color:var(--accent); }
+  .modal-x { float:right; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; }
+  .modal-x:hover { color:var(--text); }
   @media (max-width:760px){ .erp-board{ grid-template-columns:1fr; } .erp-search{ width:100%; max-width:none; } }
   .erp-col-add { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; padding:5px 11px; border-radius:3px; cursor:pointer; border:1px solid var(--accent); background:transparent; color:var(--accent); letter-spacing:.5px; }
   .erp-col-add:hover { background:var(--accent); color:#000; }
@@ -846,6 +872,11 @@
       <button class="btn btn-primary" onclick="crearDespacho()">Crear despacho</button>
     </div>
   </div>
+</div>
+
+<!-- Modal detalle mueble (ERP) -->
+<div class="modal-overlay" id="modalMuebleDetail">
+  <div class="modal" id="muebleDetailContent" style="width:600px;max-width:95vw;max-height:88vh;overflow-y:auto"></div>
 </div>
 
 <!-- Modal historial -->
@@ -1123,21 +1154,33 @@ async function crearDespacho() {
 async function loadErpDetail(id) {
   const { data: muebles, error } = await db.from('despacho_muebles').select('*').eq('proyecto_id', id).order('mf_n');
   if (error) return showToast('Error cargando muebles', 'error');
-  const { data: bultos } = await db.from('bultos').select('mueble_mf_n, escaneado').eq('proyecto_id', id);
+  const { data: bultos } = await db.from('bultos').select('*').eq('proyecto_id', id).order('numero');
+  window._erpMuebles = muebles || [];
+  window._erpBultos = bultos || [];
   const byM = {};
   (bultos || []).forEach(b => { const k = b.mueble_mf_n || ''; if (!byM[k]) byM[k] = { total: 0, scan: 0 }; byM[k].total++; if (b.escaneado) byM[k].scan++; });
   renderErp(currentProject, (muebles || []).map(m => ({ ...m, _bultos: byM[m.mf_n] || { total: 0, scan: 0 } })));
 }
 
+function _erpEstado(m) {
+  if (!m.impreso) return 'pend';
+  const b = m._bultos || { total: 0, scan: 0 };
+  if (b.total > 0 && b.scan === b.total) return 'fuera';
+  return 'comp';
+}
+
 function renderErp(p, muebles) {
   const esc = s => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
-  const pend = muebles.filter(m => !m.impreso);
-  const comp = muebles.filter(m => m.impreso);
+  const pend = muebles.filter(m => _erpEstado(m) === 'pend');
+  const comp = muebles.filter(m => _erpEstado(m) === 'comp');
+  const fuera = muebles.filter(m => _erpEstado(m) === 'fuera');
   const card = m => {
     const b = m._bultos || { total: 0, scan: 0 };
     const meta = b.total ? `${b.scan}/${b.total} bultos escaneados` : 'sin bultos asignados';
-    return `<div class="erp-card">
-      <div class="erp-card-row"><span class="erp-card-code">${esc(m.codigo || m.mf_n)}</span>${m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : ''}</div>
+    const est = _erpEstado(m);
+    const badge = est === 'fuera' ? '<span class="erp-badge out">↗ DESPACHADO</span>' : (m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : '');
+    return `<div class="erp-card" onclick="openMuebleDetail('${esc(m.mf_n)}')">
+      <div class="erp-card-row"><span class="erp-card-code">${esc(m.codigo || m.mf_n)}</span>${badge}</div>
       ${m.nombre ? `<div class="erp-card-nombre">${esc(m.nombre)}</div>` : ''}
       <div class="erp-card-meta">${meta}</div>
     </div>`;
@@ -1153,8 +1196,105 @@ function renderErp(p, muebles) {
     <div class="erp-board">
       ${col('Pendiente', 'var(--muted)', pend, true)}
       ${col('Completado', 'var(--success)', comp, false)}
-      ${col('Fuera', '#ff9d2e', [], false)}
+      ${col('Fuera', '#ff9d2e', fuera, false)}
     </div>`;
+}
+
+function openMuebleDetail(mfn) {
+  const m = (window._erpMuebles || []).find(x => String(x.mf_n) === String(mfn));
+  if (!m) return;
+  const esc = s => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+  const bultos = (window._erpBultos || []).filter(b => String(b.mueble_mf_n) === String(mfn)).sort((a, b) => a.numero - b.numero);
+  window._muebleActual = mfn;
+  const total = bultos.length, done = bultos.filter(b => b.escaneado).length, pct = total ? Math.round(done / total * 100) : 0;
+  const fueraState = m.impreso && total > 0 && done === total;
+  const badge = fueraState ? '<span class="erp-badge out">↗ DESPACHADO</span>' : (m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : '<span class="erp-badge pend">— PENDIENTE</span>');
+  const editBtn = done === 0
+    ? `<button class="btn btn-secondary btn-sm" onclick="editarMueble('${esc(mfn)}')">✏️ Editar</button>`
+    : `<button class="btn btn-secondary btn-sm" disabled title="Hay escaneos, no se puede editar" style="opacity:.4;cursor:not-allowed">✏️ Editar</button>`;
+  document.getElementById('muebleDetailContent').innerHTML = `
+    <button class="modal-x" onclick="closeModal('modalMuebleDetail')">✕</button>
+    <div class="md-code">${esc(m.codigo || m.mf_n)}</div>
+    <div class="md-name">${esc(m.nombre || '')}</div>
+    <div class="md-sub">${esc(currentProject ? currentProject.nombre : '')} ${badge}</div>
+    <div class="md-actions">
+      <button class="btn btn-primary btn-sm" onclick="imprimirMueble('${esc(mfn)}')">🖨 Imprimir etiquetas</button>
+      ${editBtn}
+      <button class="btn btn-secondary btn-sm" onclick="resetMueble('${esc(mfn)}')">↺ Resetear</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarMueble('${esc(mfn)}')">🗑 Eliminar</button>
+    </div>
+    <div class="md-stats">
+      <div class="md-stat"><div class="md-stat-v">${done}</div><div class="md-stat-l">Escaneados</div></div>
+      <div class="md-stat"><div class="md-stat-v" style="color:var(--muted)">${total - done}</div><div class="md-stat-l">Pendientes</div></div>
+      <div class="md-stat"><div class="md-stat-v">${total}</div><div class="md-stat-l">Total</div></div>
+      <div class="md-stat"><div class="md-stat-v">${pct}%</div><div class="md-stat-l">Progreso</div></div>
+    </div>
+    <div class="md-track"><div class="md-fill" style="width:${pct}%"></div></div>
+    <div class="section-title" style="margin-top:16px">Bultos</div>
+    <div class="md-bultos">
+      ${bultos.length ? bultos.map(b => `<div class="md-bcard ${b.escaneado ? 'scanned' : ''}">
+        <div class="md-bnum">#${String(b.numero).padStart(2, '0')}</div>
+        ${b.descripcion ? `<div class="md-bdesc">${esc(b.descripcion)}</div>` : ''}
+        <div class="md-bstatus">${b.escaneado ? '✓ ESCANEADO' : '— PENDIENTE'}</div>
+        ${!b.escaneado ? `<button class="md-bmark" onclick="marcarBultoErp('${b.id}', ${b.numero})">✓ Marcar</button>` : ''}
+      </div>`).join('') : '<div class="erp-col-empty">Sin bultos</div>'}
+    </div>`;
+  openModal('modalMuebleDetail');
+}
+
+async function imprimirMueble(mfn) {
+  if (!currentProject) return;
+  const bultos = (window._erpBultos || []).filter(b => String(b.mueble_mf_n) === String(mfn)).sort((a, b) => a.numero - b.numero);
+  if (!bultos.length) return showToast('Este mueble no tiene bultos', 'error');
+  const { error } = await db.from('despacho_muebles').update({ impreso: true, impreso_at: new Date().toISOString() }).eq('proyecto_id', currentProject.id).eq('mf_n', mfn);
+  if (error) return showToast('Error: ' + error.message, 'error');
+  if (typeof log === 'function') await log('IMPRESO', `Mueble ${mfn} — ${currentProject.nombre}`);
+  await loadProjects();
+  await loadErpDetail(currentProject.id);
+  openMuebleDetail(mfn);
+  printLabels(bultos);
+}
+
+async function marcarBultoErp(bultoId, numero) {
+  if (!confirm(`¿Marcar el bulto #${String(numero).padStart(2, '0')} como escaneado?`)) return;
+  const { error } = await db.from('bultos').update({ escaneado: true, fecha_escaneo: new Date().toISOString() }).eq('id', bultoId);
+  if (error) return showToast('Error: ' + error.message, 'error');
+  if (typeof log === 'function') await log('MARCADO MANUAL', `Bulto #${String(numero).padStart(2, '0')} — ${currentProject.nombre}`);
+  showToast(`Bulto #${String(numero).padStart(2, '0')} marcado ✓`, 'success');
+  const mfn = window._muebleActual;
+  await loadProjects();
+  await loadErpDetail(currentProject.id);
+  if (mfn) openMuebleDetail(mfn);
+}
+
+async function resetMueble(mfn) {
+  if (!currentProject) return;
+  if (!confirm('¿Resetear este mueble? Vuelve a Pendiente y borra los escaneos.')) return;
+  const e1 = (await db.from('bultos').update({ escaneado: false, fecha_escaneo: null }).eq('proyecto_id', currentProject.id).eq('mueble_mf_n', mfn)).error;
+  const e2 = (await db.from('despacho_muebles').update({ impreso: false, impreso_at: null }).eq('proyecto_id', currentProject.id).eq('mf_n', mfn)).error;
+  if (e1 || e2) return showToast('Error: ' + (e1 || e2).message, 'error');
+  if (typeof log === 'function') await log('RESET', `Mueble ${mfn} — ${currentProject.nombre}`);
+  showToast('Mueble reseteado ✓', 'success');
+  closeModal('modalMuebleDetail');
+  await loadProjects();
+  await loadErpDetail(currentProject.id);
+}
+
+async function eliminarMueble(mfn) {
+  if (!currentProject) return;
+  if (!confirm('¿Eliminar este mueble del despacho? Se borran sus bultos.')) return;
+  const e1 = (await db.from('bultos').delete().eq('proyecto_id', currentProject.id).eq('mueble_mf_n', mfn)).error;
+  const e2 = (await db.from('despacho_muebles').delete().eq('proyecto_id', currentProject.id).eq('mf_n', mfn)).error;
+  if (e1 || e2) return showToast('Error: ' + (e1 || e2).message, 'error');
+  if (typeof log === 'function') await log('ELIMINADO', `Mueble ${mfn} — ${currentProject.nombre}`);
+  showToast('Mueble eliminado', 'success');
+  closeModal('modalMuebleDetail');
+  await loadProjects();
+  await loadErpDetail(currentProject.id);
+}
+
+function editarMueble(mfn) {
+  showToast('Edición de mueble: próximo lote', 'error');
 }
 
 // ---- Create project ----
@@ -1225,9 +1365,10 @@ function loadExcel(event) {
 }
 
 // ---- Print ----
-async function printLabels() {
-  if (!currentProject || !window._currentBultos) return;
-  const bultos = window._currentBultos;
+async function printLabels(bultosArg) {
+  if (!currentProject) return;
+  const bultos = bultosArg || window._currentBultos;
+  if (!bultos || !bultos.length) return;
   const proyecto = currentProject.nombre;
 
   const printArea = document.getElementById('printArea');
@@ -1436,7 +1577,7 @@ async function deleteProject() {
 // ---- Polling cada 5 segundos ----
 setInterval(() => {
   loadProjects();
-  if (currentProject) loadProjectDetail(currentProject.id);
+  if (currentProject) { currentMode === 'erp' ? loadErpDetail(currentProject.id) : loadProjectDetail(currentProject.id); }
 }, 60000);
 
 // ---- Helpers ----
