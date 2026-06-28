@@ -805,8 +805,8 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <div class="mode-toggle">
-        <button class="mode-btn active" id="modeLogistica" onclick="setMode('logistica')">Logística</button>
-        <button class="mode-btn" id="modeErp" onclick="setMode('erp')">ERP</button>
+        <button class="mode-btn" id="modeLogistica" onclick="setMode('logistica')">Logística</button>
+        <button class="mode-btn active" id="modeErp" onclick="setMode('erp')">ERP</button>
       </div>
       <span class="loading" id="loadingProjects" style="display:none"></span>
     </div>
@@ -935,7 +935,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let projects = [];
 let currentProject = null;
 let excelBultos = null;
-let currentMode = 'logistica'; // 'logistica' | 'erp'
+let currentMode = 'erp'; // 'logistica' | 'erp'
 
 // ---- Load projects ----
 async function loadProjects() {
@@ -1639,7 +1639,7 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
   el.addEventListener('click', (e) => { if (e.target === el) el.classList.remove('open'); });
 });
 
-loadProjects();
+setMode('erp');
 
 // ── Mobile drawer ──
 function openDrawer() {
