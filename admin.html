@@ -1146,21 +1146,25 @@ async function crearDespacho() {
     proyId = proj.id;
   }
   const { data: dup } = await db.from('despacho_muebles').select('id').eq('proyecto_id', proyId).eq('mf_n', mfn).limit(1);
-  if (dup && dup.length) return showToast('Ese mueble ya está en el despacho', 'error');
-  const cant = (mueble && mueble.cant != null && !isNaN(Number(mueble.cant))) ? Math.trunc(Number(mueble.cant)) : null;
-  const { error: eM } = await db.from('despacho_muebles')
-    .insert({ proyecto_id: proyId, mf_n: mfn, codigo, nombre: nombreMueble || (mueble && mueble.nombre) || '', cant, impreso: false });
-  if (eM) return showToast('Error creando mueble: ' + eM.message, 'error');
+  const yaExiste = !!(dup && dup.length);
+  if (!yaExiste) {
+    const cant = (mueble && mueble.cant != null && !isNaN(Number(mueble.cant))) ? Math.trunc(Number(mueble.cant)) : null;
+    const { error: eM } = await db.from('despacho_muebles')
+      .insert({ proyecto_id: proyId, mf_n: mfn, codigo, nombre: nombreMueble || (mueble && mueble.nombre) || '', cant, impreso: false });
+    if (eM) return showToast('Error creando mueble: ' + eM.message, 'error');
+  }
   const { data: maxRow } = await db.from('bultos').select('numero').eq('proyecto_id', proyId).order('numero', { ascending: false }).limit(1);
   let next = (maxRow && maxRow.length ? (maxRow[0].numero || 0) : 0) + 1;
+  const { data: bMueble } = await db.from('bultos').select('id').eq('proyecto_id', proyId).eq('mueble_mf_n', mfn);
+  const baseB = (bMueble ? bMueble.length : 0);
   const bultos = [];
   for (let i = 1; i <= nBultos; i++) {
-    bultos.push({ proyecto_id: proyId, numero: next++, mueble_mf_n: mfn, descripcion: `${codigo || mfn}-B${String(i).padStart(2, '0')}` });
+    bultos.push({ proyecto_id: proyId, numero: next++, mueble_mf_n: mfn, descripcion: `${codigo || mfn}-B${String(baseB + i).padStart(2, '0')}` });
   }
   const { error: eB } = await db.from('bultos').insert(bultos);
   if (eB) return showToast('Error creando bultos: ' + eB.message, 'error');
   closeModal('modalCrearDespacho');
-  showToast('Despacho creado ✓', 'success');
+  showToast(yaExiste ? 'Bultos agregados ✓' : 'Despacho creado ✓', 'success');
   await loadOdfCatalog();
   await loadErpBoard();
 }
