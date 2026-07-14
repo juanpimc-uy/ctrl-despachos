@@ -1089,13 +1089,13 @@ function filtrarProyDespacho() {
   if (!inp || !list) return;
   const q = (inp.value || '').toLowerCase().trim();
   const lista = (window._odfCatalog || []).filter(o =>
-    [o.odf_numero, o.cliente].join(' ').toLowerCase().includes(q));
+    [o.odf_numero, o.nombre, o.cliente].join(' ').toLowerCase().includes(q));
   if (!lista.length) {
     list.innerHTML = '<div class="erp-search-item" style="cursor:default;color:var(--muted)">Sin proyectos</div>';
   } else {
     list.innerHTML = lista.map(o => {
       const n = Array.isArray(o.muebles) ? o.muebles.length : 0;
-      return `<div class="erp-search-item" onmousedown="selProyDespacho('${o.odf_numero}')"><span class="n">${o.odf_numero}</span> <span class="c">${o.cliente || ''}</span><span class="m">${n} muebles</span></div>`;
+      return `<div class="erp-search-item" onmousedown="selProyDespacho('${o.odf_numero}')"><span class="n">${o.odf_numero}</span> <span class="c">${o.nombre || o.cliente || ''}</span><span class="m">${n} muebles</span></div>`;
     }).join('');
   }
   list.style.display = 'block';
@@ -1105,7 +1105,7 @@ async function selProyDespacho(odfNumero) {
   const o = (window._odfCatalog || []).find(x => x.odf_numero === odfNumero);
   if (!o) return;
   document.getElementById('cdProyOdf').value = odfNumero;
-  document.getElementById('cdProySearch').value = o.odf_numero + (o.cliente ? ' · ' + o.cliente : '');
+  document.getElementById('cdProySearch').value = o.odf_numero + (o.nombre ? ' · ' + o.nombre : (o.cliente ? ' · ' + o.cliente : ''));
   document.getElementById('cdProyList').style.display = 'none';
   document.getElementById('cdCliente').value = o.cliente || '';
   let despachados = new Set();
