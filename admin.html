@@ -739,6 +739,7 @@
   .erp-card-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
   .erp-card-code { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--accent); }
   .erp-card-nombre { font-size:12px; font-weight:600; color:#ccc; margin-bottom:6px; }
+  .erp-card-envio { font-family:'JetBrains Mono',monospace; font-size:10px; color:#ff9d2e; border:1px solid #5a3a12; background:#2a1c0a; border-radius:5px; padding:1px 6px; }
   .erp-card-meta { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); }
   .erp-badge { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:3px; }
   .erp-badge.ok { background:#0a1f0a; color:var(--success); border:1px solid #1a3a1a; }
@@ -1152,26 +1153,24 @@ async function crearDespacho() {
     if (error) return showToast('Error creando proyecto: ' + error.message, 'error');
     proyId = proj.id;
   }
-  const { data: dup } = await db.from('despacho_muebles').select('id').eq('proyecto_id', proyId).eq('mf_n', mfn).limit(1);
-  const yaExiste = !!(dup && dup.length);
-  if (!yaExiste) {
-    const cant = (mueble && mueble.cant != null && !isNaN(Number(mueble.cant))) ? Math.trunc(Number(mueble.cant)) : null;
-    const { error: eM } = await db.from('despacho_muebles')
-      .insert({ proyecto_id: proyId, mf_n: mfn, codigo, nombre: nombreMueble || (mueble && mueble.nombre) || '', cant, impreso: false });
-    if (eM) return showToast('Error creando mueble: ' + eM.message, 'error');
-  }
+  // Número de envío para este mueble: max(envio)+1 por (proyecto, mf_n)
+  const { data: prevEnvios } = await db.from('despacho_muebles').select('envio').eq('proyecto_id', proyId).eq('mf_n', mfn).order('envio', { ascending: false }).limit(1);
+  const envio = (prevEnvios && prevEnvios.length ? (prevEnvios[0].envio || 1) : 0) + 1;
+  const cant = (mueble && mueble.cant != null && !isNaN(Number(mueble.cant))) ? Math.trunc(Number(mueble.cant)) : null;
+  const { error: eM } = await db.from('despacho_muebles')
+    .insert({ proyecto_id: proyId, mf_n: mfn, codigo, nombre: nombreMueble || (mueble && mueble.nombre) || '', cant, impreso: false, envio });
+  if (eM) return showToast('Error creando envío: ' + eM.message, 'error');
   const { data: maxRow } = await db.from('bultos').select('numero').eq('proyecto_id', proyId).order('numero', { ascending: false }).limit(1);
   let next = (maxRow && maxRow.length ? (maxRow[0].numero || 0) : 0) + 1;
-  const { data: bMueble } = await db.from('bultos').select('id').eq('proyecto_id', proyId).eq('mueble_mf_n', mfn);
-  const baseB = (bMueble ? bMueble.length : 0);
   const bultos = [];
   for (let i = 1; i <= nBultos; i++) {
-    bultos.push({ proyecto_id: proyId, numero: next++, mueble_mf_n: mfn, descripcion: `${codigo || mfn}-B${String(baseB + i).padStart(2, '0')}` });
+    const desc = envio === 1 ? `${codigo || mfn}-B${String(i).padStart(2, '0')}` : `${codigo || mfn}-E${envio}-B${String(i).padStart(2, '0')}`;
+    bultos.push({ proyecto_id: proyId, numero: next++, mueble_mf_n: mfn, envio, descripcion: desc });
   }
   const { error: eB } = await db.from('bultos').insert(bultos);
   if (eB) return showToast('Error creando bultos: ' + eB.message, 'error');
   closeModal('modalCrearDespacho');
-  showToast(yaExiste ? 'Bultos agregados ✓' : 'Despacho creado ✓', 'success');
+  showToast(envio > 1 ? `Envío ${envio} creado ✓` : 'Despacho creado ✓', 'success');
   await loadOdfCatalog();
   await loadErpBoard();
 }
@@ -1188,7 +1187,7 @@ async function loadErpBoard() {
     const { data: bts } = await db.from('bultos').select('*').in('proyecto_id', ids);
     allBultos = bts || [];
     muebles = (dms || []).map(dm => {
-      const bs = allBultos.filter(b => String(b.proyecto_id) === String(dm.proyecto_id) && String(b.mueble_mf_n) === String(dm.mf_n));
+      const bs = allBultos.filter(b => String(b.proyecto_id) === String(dm.proyecto_id) && String(b.mueble_mf_n) === String(dm.mf_n) && (b.envio || 1) === (dm.envio || 1));
       const p = window._erpProyectos[dm.proyecto_id] || {};
       return { ...dm, odf_nombre: p.nombre || '', odf_numero: p.odf_numero || '', _bultos: { total: bs.length, scan: bs.filter(b => b.escaneado).length } };
     });
@@ -1237,9 +1236,10 @@ function renderErp() {
     const meta = b.total ? `${b.scan}/${b.total} bultos escaneados` : 'sin bultos asignados';
     const est = _erpEstado(m);
     const badge = est === 'fuera' ? '<span class="erp-badge out">↗ DESPACHADO</span>' : (m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : '');
-    return `<div class="erp-card" onclick="openMuebleDetail('${esc(m.proyecto_id)}','${esc(m.mf_n)}')">
+    const envioTag = (m.envio && m.envio > 1) ? ` <span class="erp-card-envio">ENVÍO ${m.envio}</span>` : '';
+    return `<div class="erp-card" onclick="openMuebleDetail('${esc(m.proyecto_id)}','${esc(m.mf_n)}',${m.envio || 1})">
       <div class="erp-card-top"><span class="erp-card-odf">${esc(m.odf_nombre || m.odf_numero || '')}</span>${badge}</div>
-      <div class="erp-card-code">${esc(m.codigo || m.mf_n)}</div>
+      <div class="erp-card-code">${esc(m.codigo || m.mf_n)}${envioTag}</div>
       ${m.nombre ? `<div class="erp-card-nombre">${esc(m.nombre)}</div>` : ''}
       <div class="erp-card-meta">${meta}</div>
     </div>`;
