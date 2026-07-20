@@ -1260,29 +1260,30 @@ function renderErp() {
     </div>`;
 }
 
-function openMuebleDetail(proyectoId, mfn) {
+function openMuebleDetail(proyectoId, mfn, envio) {
+  envio = envio || 1;
   currentProject = window._erpProyectos ? window._erpProyectos[proyectoId] : null;
-  const m = (window._erpMuebles || []).find(x => String(x.proyecto_id) === String(proyectoId) && String(x.mf_n) === String(mfn));
+  const m = (window._erpMuebles || []).find(x => String(x.proyecto_id) === String(proyectoId) && String(x.mf_n) === String(mfn) && (x.envio || 1) === envio);
   if (!m) return;
   const esc = s => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'));
-  const bultos = (window._erpBultos || []).filter(b => String(b.proyecto_id) === String(proyectoId) && String(b.mueble_mf_n) === String(mfn)).sort((a, b) => a.numero - b.numero);
-  window._muebleActual = { proyectoId, mfn };
+  const bultos = (window._erpBultos || []).filter(b => String(b.proyecto_id) === String(proyectoId) && String(b.mueble_mf_n) === String(mfn) && (b.envio || 1) === envio).sort((a, b) => a.numero - b.numero);
+  window._muebleActual = { proyectoId, mfn, envio };
   const total = bultos.length, done = bultos.filter(b => b.escaneado).length, pct = total ? Math.round(done / total * 100) : 0;
   const fueraState = total > 0 && done === total;
   const badge = fueraState ? '<span class="erp-badge out">↗ DESPACHADO</span>' : (m.impreso ? '<span class="erp-badge ok">✓ IMPRESO</span>' : '<span class="erp-badge pend">— PENDIENTE</span>');
   const editBtn = done === 0
-    ? `<button class="btn btn-secondary btn-sm" onclick="editarMueble('${esc(proyectoId)}','${esc(mfn)}')">✏️ Editar</button>`
+    ? `<button class="btn btn-secondary btn-sm" onclick="editarMueble('${esc(proyectoId)}','${esc(mfn)}',${envio})">✏️ Editar</button>`
     : `<button class="btn btn-secondary btn-sm" disabled title="Hay escaneos, no se puede editar" style="opacity:.4;cursor:not-allowed">✏️ Editar</button>`;
   document.getElementById('muebleDetailContent').innerHTML = `
     <button class="modal-x" onclick="closeModal('modalMuebleDetail')">✕</button>
     <div class="md-code">${esc(m.codigo || m.mf_n)}</div>
     <div class="md-name">${esc(m.nombre || '')}</div>
-    <div class="md-sub">${esc(m.odf_nombre || '')} ${badge}</div>
+    <div class="md-sub">${esc(m.odf_nombre || '')}${envio > 1 ? ' · ENVÍO ' + envio : ''} ${badge}</div>
     <div class="md-actions">
-      <button class="btn btn-primary btn-sm" onclick="imprimirMueble('${esc(proyectoId)}','${esc(mfn)}')">🖨 Imprimir etiquetas</button>
+      <button class="btn btn-primary btn-sm" onclick="imprimirMueble('${esc(proyectoId)}','${esc(mfn)}',${envio})">🖨 Imprimir etiquetas</button>
       ${editBtn}
-      <button class="btn btn-secondary btn-sm" onclick="resetMueble('${esc(proyectoId)}','${esc(mfn)}')">↺ Resetear</button>
-      <button class="btn btn-danger btn-sm" onclick="eliminarMueble('${esc(proyectoId)}','${esc(mfn)}')">🗑 Eliminar</button>
+      <button class="btn btn-secondary btn-sm" onclick="resetMueble('${esc(proyectoId)}','${esc(mfn)}',${envio})">↺ Resetear</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarMueble('${esc(proyectoId)}','${esc(mfn)}',${envio})">🗑 Eliminar</button>
     </div>
     <div class="md-stats">
       <div class="md-stat"><div class="md-stat-v">${done}</div><div class="md-stat-l">Escaneados</div></div>
@@ -1303,17 +1304,18 @@ function openMuebleDetail(proyectoId, mfn) {
   openModal('modalMuebleDetail');
 }
 
-async function imprimirMueble(proyectoId, mfn) {
+async function imprimirMueble(proyectoId, mfn, envio) {
+  envio = envio || 1;
   const proy = window._erpProyectos ? window._erpProyectos[proyectoId] : null;
   if (!proy) return;
   currentProject = proy;
-  const bultos = (window._erpBultos || []).filter(b => String(b.proyecto_id) === String(proyectoId) && String(b.mueble_mf_n) === String(mfn)).sort((a, b) => a.numero - b.numero);
+  const bultos = (window._erpBultos || []).filter(b => String(b.proyecto_id) === String(proyectoId) && String(b.mueble_mf_n) === String(mfn) && (b.envio || 1) === envio).sort((a, b) => a.numero - b.numero);
   if (!bultos.length) return showToast('Este mueble no tiene bultos', 'error');
-  const { error } = await db.from('despacho_muebles').update({ impreso: true, impreso_at: new Date().toISOString() }).eq('proyecto_id', proyectoId).eq('mf_n', mfn);
+  const { error } = await db.from('despacho_muebles').update({ impreso: true, impreso_at: new Date().toISOString() }).eq('proyecto_id', proyectoId).eq('mf_n', mfn).eq('envio', envio);
   if (error) return showToast('Error: ' + error.message, 'error');
   if (typeof log === 'function') await log('IMPRESO', `Mueble ${mfn} — ${proy.nombre}`);
   await loadErpBoard();
-  openMuebleDetail(proyectoId, mfn);
+  openMuebleDetail(proyectoId, mfn, envio);
   printLabels(bultos);
 }
 
@@ -1325,13 +1327,14 @@ async function marcarBultoErp(bultoId, numero) {
   showToast(`Bulto #${String(numero).padStart(2, '0')} marcado ✓`, 'success');
   const ma = window._muebleActual;
   await loadErpBoard();
-  if (ma) openMuebleDetail(ma.proyectoId, ma.mfn);
+  if (ma) openMuebleDetail(ma.proyectoId, ma.mfn, ma.envio);
 }
 
-async function resetMueble(proyectoId, mfn) {
+async function resetMueble(proyectoId, mfn, envio) {
+  envio = envio || 1;
   if (!confirm('¿Resetear este mueble? Vuelve a Pendiente y borra los escaneos.')) return;
-  const e1 = (await db.from('bultos').update({ escaneado: false, fecha_escaneo: null }).eq('proyecto_id', proyectoId).eq('mueble_mf_n', mfn)).error;
-  const e2 = (await db.from('despacho_muebles').update({ impreso: false, impreso_at: null }).eq('proyecto_id', proyectoId).eq('mf_n', mfn)).error;
+  const e1 = (await db.from('bultos').update({ escaneado: false, fecha_escaneo: null }).eq('proyecto_id', proyectoId).eq('mueble_mf_n', mfn).eq('envio', envio)).error;
+  const e2 = (await db.from('despacho_muebles').update({ impreso: false, impreso_at: null }).eq('proyecto_id', proyectoId).eq('mf_n', mfn).eq('envio', envio)).error;
   if (e1 || e2) return showToast('Error: ' + (e1 || e2).message, 'error');
   if (typeof log === 'function') await log('RESET', `Mueble ${mfn}`);
   showToast('Mueble reseteado ✓', 'success');
@@ -1339,10 +1342,11 @@ async function resetMueble(proyectoId, mfn) {
   await loadErpBoard();
 }
 
-async function eliminarMueble(proyectoId, mfn) {
+async function eliminarMueble(proyectoId, mfn, envio) {
+  envio = envio || 1;
   if (!confirm('¿Eliminar este mueble del despacho? Se borran sus bultos.')) return;
-  const e1 = (await db.from('bultos').delete().eq('proyecto_id', proyectoId).eq('mueble_mf_n', mfn)).error;
-  const e2 = (await db.from('despacho_muebles').delete().eq('proyecto_id', proyectoId).eq('mf_n', mfn)).error;
+  const e1 = (await db.from('bultos').delete().eq('proyecto_id', proyectoId).eq('mueble_mf_n', mfn).eq('envio', envio)).error;
+  const e2 = (await db.from('despacho_muebles').delete().eq('proyecto_id', proyectoId).eq('mf_n', mfn).eq('envio', envio)).error;
   if (e1 || e2) return showToast('Error: ' + (e1 || e2).message, 'error');
   if (typeof log === 'function') await log('ELIMINADO', `Mueble ${mfn}`);
   showToast('Mueble eliminado', 'success');
@@ -1350,7 +1354,7 @@ async function eliminarMueble(proyectoId, mfn) {
   await loadErpBoard();
 }
 
-function editarMueble(proyectoId, mfn) {
+function editarMueble(proyectoId, mfn, envio) {
   showToast('Edición de mueble: próximo lote', 'error');
 }
 
