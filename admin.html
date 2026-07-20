@@ -474,6 +474,7 @@
     }
 
     .print-label {
+      position: relative;
       width: 60mm;
       height: 30mm;
       display: flex;
@@ -540,6 +541,35 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .print-label.has-mueble .label-project {
+      font-size: 10px;
+    }
+    .print-label .label-mueble {
+      font-size: 8px;
+      color: #000;
+      font-family: monospace;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .print-label .label-mueble .label-mueble-cod {
+      font-weight: 700;
+    }
+    .print-label .label-envio {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: #000;
+      color: #fff;
+      font-family: monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 1mm 2mm;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
   }
 
@@ -1294,11 +1324,11 @@ function openMuebleDetail(proyectoId, mfn, envio) {
     <div class="md-track"><div class="md-fill" style="width:${pct}%"></div></div>
     <div class="section-title" style="margin-top:16px">Bultos</div>
     <div class="md-bultos">
-      ${bultos.length ? bultos.map(b => `<div class="md-bcard ${b.escaneado ? 'scanned' : ''}">
-        <div class="md-bnum">#${String(b.numero).padStart(2, '0')}</div>
+      ${bultos.length ? bultos.map((b, i) => `<div class="md-bcard ${b.escaneado ? 'scanned' : ''}">
+        <div class="md-bnum">#${String(i + 1).padStart(2, '0')}</div>
         ${b.descripcion ? `<div class="md-bdesc">${esc(b.descripcion)}</div>` : ''}
         <div class="md-bstatus">${b.escaneado ? '✓ ESCANEADO' : '— PENDIENTE'}</div>
-        ${!b.escaneado ? `<button class="md-bmark" onclick="marcarBultoErp('${b.id}', ${b.numero})">✓ Marcar</button>` : ''}
+        ${!b.escaneado ? `<button class="md-bmark" onclick="marcarBultoErp('${b.id}', ${i + 1})">✓ Marcar</button>` : ''}
       </div>`).join('') : '<div class="erp-col-empty">Sin bultos</div>'}
     </div>`;
   openModal('modalMuebleDetail');
@@ -1316,7 +1346,8 @@ async function imprimirMueble(proyectoId, mfn, envio) {
   if (typeof log === 'function') await log('IMPRESO', `Mueble ${mfn} — ${proy.nombre}`);
   await loadErpBoard();
   openMuebleDetail(proyectoId, mfn, envio);
-  printLabels(bultos);
+  const _m = (window._erpMuebles || []).find(x => String(x.proyecto_id) === String(proyectoId) && String(x.mf_n) === String(mfn) && (x.envio || 1) === envio);
+  printLabels(bultos, _m);
 }
 
 async function marcarBultoErp(bultoId, numero) {
@@ -1426,7 +1457,7 @@ function loadExcel(event) {
 }
 
 // ---- Print ----
-async function printLabels(bultosArg) {
+async function printLabels(bultosArg, mueble) {
   if (!currentProject) return;
   const bultos = bultosArg || window._currentBultos;
   if (!bultos || !bultos.length) return;
@@ -1439,9 +1470,17 @@ async function printLabels(bultosArg) {
   const grid = document.createElement('div');
   grid.className = 'print-grid';
 
+  let _pos = 0;
   for (const b of bultos) {
+    _pos++;
     const label = document.createElement('div');
-    label.className = 'print-label';
+    label.className = mueble ? 'print-label has-mueble' : 'print-label';
+    if (mueble && (b.envio || 1) > 1) {
+      const envioBadge = document.createElement('div');
+      envioBadge.className = 'label-envio';
+      envioBadge.textContent = `ENVÍO ${b.envio}`;
+      label.appendChild(envioBadge);
+    }
 
     // QR container
     const qrDiv = document.createElement('div');
@@ -1464,7 +1503,7 @@ async function printLabels(bultosArg) {
 
     const num = document.createElement('div');
     num.className = 'label-num';
-    num.textContent = `BULTO ${String(b.numero).padStart(2,'0')}`;
+    num.textContent = `BULTO ${String(mueble ? _pos : b.numero).padStart(2,'0')}`;
 
     const total = document.createElement('div');
     total.className = 'label-total';
@@ -1475,6 +1514,16 @@ async function printLabels(bultosArg) {
     logoImg.style.cssText = 'width:80%;height:auto;max-height:8mm;object-fit:contain;margin-bottom:1mm;display:block';
     info.appendChild(logoImg);
     info.appendChild(pName);
+    if (mueble && mueble.codigo) {
+      const mDiv = document.createElement('div');
+      mDiv.className = 'label-mueble';
+      const cod = document.createElement('span');
+      cod.className = 'label-mueble-cod';
+      cod.textContent = mueble.codigo;
+      mDiv.appendChild(cod);
+      if (mueble.nombre) mDiv.appendChild(document.createTextNode(' · ' + mueble.nombre));
+      info.appendChild(mDiv);
+    }
     info.appendChild(num);
     info.appendChild(total);
 
