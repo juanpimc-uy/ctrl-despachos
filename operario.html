@@ -61,6 +61,12 @@ body { background: var(--bg); color: var(--text); font-family: "DM Sans", sans-s
 .bulto-check { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; transition: all 0.2s; }
 .bulto-check.done { background: var(--success); border-color: var(--success); color: #000; }
 .bulto-num { font-family: "Space Mono", monospace; font-size: 14px; font-weight: 700; }
+.grp-head { margin: 18px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.grp-head:first-child { margin-top: 0; }
+.grp-title { font-family: "Space Mono", monospace; font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+.grp-envio { font-family: "Space Mono", monospace; font-size: 10px; color: #ff9d2e; border: 1px solid #5a3a12; background: #2a1c0a; border-radius: 5px; padding: 2px 7px; margin-left: 7px; letter-spacing: 1px; }
+.grp-nombre { font-size: 12px; color: var(--text); margin-top: 3px; }
+.grp-prog { font-family: "Space Mono", monospace; font-size: 10px; color: var(--muted); margin-top: 4px; }
 .bulto-row.scanned .bulto-num { color: var(--success); }
 .bulto-desc { font-size: 11px; color: var(--muted); }
 .bulto-time { font-size: 10px; color: var(--muted); font-family: "Space Mono", monospace; margin-left: auto; }
@@ -137,7 +143,7 @@ const URL_ = 'https://vbbvftdiusiydfcfcuie.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZiYnZmdGRpdXNpeWRmY2ZjdWllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTU3NDEsImV4cCI6MjA5MDQ3MTc0MX0.n8qtGhIK2-yKw7IC9m4XeEBUuZ2aC89VdELvkRBA4ck';
 const H = { 'apikey': KEY_, 'Authorization': 'Bearer ' + KEY_ };
 
-let proj = null, bultos = [], scanner = null, busy = false, lastId = null;
+let proj = null, bultos = [], muebles = [], scanner = null, busy = false, lastId = null;
 
 async function api(path) {
   const r = await fetch(URL_ + '/rest/v1/' + path, { headers: H });
@@ -184,12 +190,14 @@ async function loadProjects() {
 
 async function startScan(projectId) {
   try {
-    const [projs, bs] = await Promise.all([
+    const [projs, bs, ms] = await Promise.all([
       api('proyectos?id=eq.' + projectId + '&limit=1'),
-      api('bultos?proyecto_id=eq.' + projectId + '&order=numero')
+      api('bultos?proyecto_id=eq.' + projectId + '&order=numero'),
+      api('despacho_muebles?proyecto_id=eq.' + projectId)
     ]);
     proj = projs[0];
     bultos = bs;
+    muebles = Array.isArray(ms) ? ms : [];
   } catch(e) { alert('Error cargando proyecto.'); return; }
 
   document.getElementById('hdr-title').textContent = proj.nombre;
@@ -218,7 +226,8 @@ async function onScan(text) {
   if (b.escaneado) {
     if (lastId === d.bid) return;
     lastId = d.bid;
-    setStatus('warn', `Bulto #${String(b.numero).padStart(2,'0')} ya escaneado`, '');
+    const _pw = _posDe(b);
+    setStatus('warn', `Bulto ${String(_pw.pos).padStart(2,'0')} de ${String(_pw.tot).padStart(2,'0')} ya escaneado`, _rotuloGrupo(b));
     flash('bad');
     setTimeout(() => { lastId = null; }, 2000);
     return;
@@ -238,7 +247,9 @@ async function onScan(text) {
   bultos[idx].fecha_escaneo = new Date().toISOString();
 
   const done = bultos.filter(x=>x.escaneado).length;
-  setStatus('ok', `✓ Bulto #${String(b.numero).padStart(2,'0')} registrado`, `${done} de ${bultos.length} escaneados`);
+  const _pk = _posDe(b);
+  const _rg = _rotuloGrupo(b);
+  setStatus('ok', `✓ ${_rg ? _rg + ' · ' : ''}Bulto ${String(_pk.pos).padStart(2,'0')} de ${String(_pk.tot).padStart(2,'0')}`, `${done} de ${bultos.length} en el proyecto`);
   flash('ok');
   updateProgress();
   renderBultos(d.bid);
@@ -259,28 +270,65 @@ function updateProgress() {
   f.className = 'prog-fill' + (d===t&&t>0?' done':'');
 }
 
+function _gkey(b) { return (b.mueble_mf_n || '') + '|' + (b.envio || 1); }
+function _hermanos(b) { return bultos.filter(x => _gkey(x) === _gkey(b)).sort((x,y) => (x.numero||0) - (y.numero||0)); }
+function _posDe(b) { const h = _hermanos(b); return { pos: h.findIndex(x => x.id === b.id) + 1, tot: h.length }; }
+function _muebleDe(b) { return muebles.find(m => String(m.mf_n) === String(b.mueble_mf_n || '') && (m.envio || 1) === (b.envio || 1)) || null; }
+function _rotuloGrupo(b) { const m = _muebleDe(b); if (!m) return ''; return (m.codigo || '') + ((b.envio || 1) > 1 ? ' · ENVÍO ' + b.envio : ''); }
+
 function renderBultos(justId) {
-  const sorted = [...bultos.filter(b=>!b.escaneado), ...bultos.filter(b=>b.escaneado).reverse()];
-  document.getElementById('bulto-list').innerHTML = sorted.map(b => {
-    const hora = b.fecha_escaneo ? new Date(b.fecha_escaneo).toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'}) : '';
-    return `<div class="bulto-row ${b.escaneado?'scanned':''}" id="brow-${b.id}">
-      <div class="bulto-check ${b.escaneado?'done':''}">${b.escaneado?'✓':''}</div>
-      <div style="flex:1">
-        <div class="bulto-num">Bulto #${String(b.numero).padStart(2,'0')} de ${String(bultos.length).padStart(2,'0')}</div>
-        ${b.descripcion?`<div class="bulto-desc">${b.descripcion}</div>`:''}
-      </div>
-      ${hora?`<div class="bulto-time">${hora}</div>`:''}
-      ${!b.escaneado?`
-        <div id="confirm-${b.id}" style="display:none;gap:6px;align-items:center">
-          <span style="font-size:11px;color:var(--muted)">¿Confirmar?</span>
-          <button onclick="marcarManual('${b.id}',${b.numero})" style="background:var(--success);border:none;color:#000;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">Sí</button>
-          <button onclick="cancelarManual('${b.id}')" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">No</button>
-        </div>
-        <button id="btn-${b.id}" onclick="pedirConfirm('${b.id}')" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap">✓ Manual</button>
-      `:''}
+  const orden = [...bultos].sort((x,y) => (x.numero||0) - (y.numero||0));
+  const map = new Map();
+  for (const b of orden) {
+    const k = _gkey(b);
+    if (!map.has(k)) map.set(k, { key: k, mf_n: b.mueble_mf_n || null, envio: b.envio || 1, items: [] });
+    map.get(k).items.push(b);
+  }
+  const grupos = [...map.values()].map(g => {
+    const m = _muebleDe(g.items[0]);
+    g.codigo = m ? (m.codigo || '') : '';
+    g.nombre = m ? (m.nombre || '') : '';
+    g.total = g.items.length;
+    g.done = g.items.filter(b => b.escaneado).length;
+    return g;
+  });
+  grupos.sort((a, b) => {
+    const ac = (a.done >= a.total) ? 1 : 0, bc = (b.done >= b.total) ? 1 : 0;
+    if (ac !== bc) return ac - bc;
+    const s = (a.codigo || 'zzz').localeCompare(b.codigo || 'zzz');
+    return s !== 0 ? s : ((a.envio || 1) - (b.envio || 1));
+  });
+  const sinEncabezado = grupos.length === 1 && !grupos[0].mf_n;
+  document.getElementById('bulto-list').innerHTML = grupos.map(g => {
+    const posOf = new Map(g.items.map((b, i) => [b.id, i + 1]));
+    const items = [...g.items.filter(b => !b.escaneado), ...g.items.filter(b => b.escaneado).reverse()];
+    const head = sinEncabezado ? '' : `<div class="grp-head">
+      <div class="grp-title">${g.codigo || 'SIN MUEBLE'}${(g.envio||1) > 1 ? `<span class="grp-envio">ENVÍO ${g.envio}</span>` : ''}</div>
+      ${g.nombre ? `<div class="grp-nombre">${g.nombre}</div>` : ''}
+      <div class="grp-prog">${g.done}/${g.total} escaneados</div>
     </div>`;
+    return head + items.map(b => {
+      const hora = b.fecha_escaneo ? new Date(b.fecha_escaneo).toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'}) : '';
+      const pos = posOf.get(b.id) || 1;
+      return `<div class="bulto-row ${b.escaneado?'scanned':''}" id="brow-${b.id}">
+        <div class="bulto-check ${b.escaneado?'done':''}">${b.escaneado?'✓':''}</div>
+        <div style="flex:1">
+          <div class="bulto-num">Bulto ${String(pos).padStart(2,'0')} de ${String(g.total).padStart(2,'0')}</div>
+          ${b.descripcion?`<div class="bulto-desc">${b.descripcion}</div>`:''}
+        </div>
+        ${hora?`<div class="bulto-time">${hora}</div>`:''}
+        ${!b.escaneado?`
+          <div id="confirm-${b.id}" style="display:none;gap:6px;align-items:center">
+            <span style="font-size:11px;color:var(--muted)">¿Confirmar?</span>
+            <button onclick="marcarManual('${b.id}',${pos})" style="background:var(--success);border:none;color:#000;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">Sí</button>
+            <button onclick="cancelarManual('${b.id}')" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">No</button>
+          </div>
+          <button id="btn-${b.id}" onclick="pedirConfirm('${b.id}')" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap">✓ Manual</button>
+        `:''}
+      </div>`;
+    }).join('');
   }).join('');
-  if (justId) { const el = document.querySelector('.bulto-row.scanned'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }
+  if (justId) { const el = document.getElementById('brow-' + justId); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }
 }
 
 function pedirConfirm(bultoId) {
@@ -348,8 +396,10 @@ function showScreen(id) {
 
 // Polling cada 60s
 setInterval(() => {
-  if (proj) api('bultos?proyecto_id=eq.' + proj.id + '&order=numero')
-    .then(data => { if(Array.isArray(data)){bultos=data;updateProgress();renderBultos();} }).catch(()=>{});
+  if (proj) Promise.all([
+    api('bultos?proyecto_id=eq.' + proj.id + '&order=numero'),
+    api('despacho_muebles?proyecto_id=eq.' + proj.id)
+  ]).then(([data, ms]) => { if(Array.isArray(data)){ bultos=data; if(Array.isArray(ms)) muebles=ms; updateProgress(); renderBultos(); } }).catch(()=>{});
 }, 60000);
 
 loadProjects();
