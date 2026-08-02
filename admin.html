@@ -1756,5 +1756,39 @@ function toggleDrawer() {
   document.querySelector('.sidebar').classList.contains('drawer-open') ? closeDrawer() : openDrawer();
 }
 </script>
+<script>
+// Modo kiosco — botón "Volver al kiosco" cuando admin.html se abre desde planta-kioscos.html (?kiosco=1)
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('kiosco') === '1') {
+      sessionStorage.setItem('kiosco_origen', '1');
+    }
+  } catch (e) {}
+  if (sessionStorage.getItem('kiosco_origen') !== '1') return;
+  var KIOSCO_URL = 'https://maderable-produccion.vercel.app/planta-kioscos.html';
+  function montar() {
+    if (document.getElementById('kiosco-volver-btn')) return;
+    var b = document.createElement('button');
+    b.id = 'kiosco-volver-btn';
+    b.type = 'button';
+    b.textContent = '\u2190 VOLVER AL KIOSCO';
+    b.style.cssText = [
+      'position:fixed', 'left:16px', 'bottom:16px', 'z-index:2147483647',
+      'background:#0f0f0f', 'color:#FFD600', 'border:2px solid #FFD600',
+      'font-family:"Space Mono",monospace', 'font-size:14px', 'font-weight:700',
+      'text-transform:uppercase', 'letter-spacing:1px', 'padding:14px 20px',
+      'border-radius:8px', 'cursor:pointer', 'min-height:48px',
+      'box-shadow:0 4px 16px rgba(0,0,0,.5)'
+    ].join(';');
+    b.addEventListener('click', function () {
+      sessionStorage.removeItem('kiosco_origen');
+      window.location.href = KIOSCO_URL;
+    });
+    document.body.appendChild(b);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
+  else montar();
+})();
+</script>
 </body>
 </html>
