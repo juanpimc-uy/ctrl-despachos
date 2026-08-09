@@ -853,10 +853,6 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="sidebar-header">
-      <div class="mode-toggle">
-        <button class="mode-btn" id="modeLogistica" onclick="setMode('logistica')">Logística</button>
-        <button class="mode-btn active" id="modeErp" onclick="setMode('erp')">ERP</button>
-      </div>
       <span class="loading" id="loadingProjects" style="display:none"></span>
     </div>
     <div class="project-list" id="projectList">
@@ -1789,6 +1785,20 @@ function toggleDrawer() {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
   else montar();
+})();
+</script>
+<script>
+// Botón "← ERP" cuando se abre desde el sidebar del ERP (?from=erp)
+(function(){
+  if (new URLSearchParams(location.search).get('from') !== 'erp') return;
+  var b = document.createElement('div');
+  b.id = 'back-to-erp';
+  b.style.cssText = 'position:fixed;top:12px;left:12px;z-index:9999;background:#0f0f0f;border:1px solid #2a2a2a;color:#FFD600;font-family:monospace;font-size:10px;letter-spacing:1px;padding:7px 12px;border-radius:4px;cursor:pointer;text-transform:uppercase;transition:border-color .15s;';
+  b.textContent = '\u2190 ERP';
+  b.onclick = function(){ location.href = 'https://maderable-produccion.vercel.app/admin.html'; };
+  b.onmouseover = function(){ b.style.borderColor = '#FFD600'; };
+  b.onmouseout = function(){ b.style.borderColor = '#2a2a2a'; };
+  document.body.appendChild(b);
 })();
 </script>
 </body>
