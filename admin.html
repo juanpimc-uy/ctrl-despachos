@@ -1101,8 +1101,6 @@ async function loadProjectDetail(id) {
 // ════════ ERP MODE (UX tercerizados) ════════
 function setMode(m) {
   currentMode = m;
-  document.getElementById('modeLogistica').classList.toggle('active', m === 'logistica');
-  document.getElementById('modeErp').classList.toggle('active', m === 'erp');
   const nb = document.getElementById('btnNuevoProyecto'); if (nb) nb.style.display = m === 'erp' ? 'none' : '';
   currentProject = null;
   if (m === 'erp') { window._erpFilter = null; loadOdfCatalog(); loadErpBoard(); }
@@ -1788,17 +1786,18 @@ function toggleDrawer() {
 })();
 </script>
 <script>
-// Botón "← ERP" cuando se abre desde el sidebar del ERP (?from=erp)
+// Botón "← ERP" dentro del header cuando se abre desde el sidebar del ERP (?from=erp)
 (function(){
   if (new URLSearchParams(location.search).get('from') !== 'erp') return;
-  var b = document.createElement('div');
-  b.id = 'back-to-erp';
-  b.style.cssText = 'position:fixed;top:12px;left:12px;z-index:9999;background:#0f0f0f;border:1px solid #2a2a2a;color:#FFD600;font-family:monospace;font-size:10px;letter-spacing:1px;padding:7px 12px;border-radius:4px;cursor:pointer;text-transform:uppercase;transition:border-color .15s;';
+  var hdr = document.querySelector('header');
+  if (!hdr) return;
+  var b = document.createElement('button');
   b.textContent = '\u2190 ERP';
+  b.style.cssText = 'background:transparent;border:1px solid #2a2a2a;color:#FFD600;font-family:monospace;font-size:10px;letter-spacing:1px;padding:6px 11px;border-radius:4px;cursor:pointer;text-transform:uppercase;margin-right:14px;flex-shrink:0;transition:border-color .15s;';
+  b.onmouseenter = function(){ b.style.borderColor = '#FFD600'; };
+  b.onmouseleave = function(){ b.style.borderColor = '#2a2a2a'; };
   b.onclick = function(){ location.href = 'https://maderable-produccion.vercel.app/admin.html'; };
-  b.onmouseover = function(){ b.style.borderColor = '#FFD600'; };
-  b.onmouseout = function(){ b.style.borderColor = '#2a2a2a'; };
-  document.body.appendChild(b);
+  hdr.insertBefore(b, hdr.firstChild);
 })();
 </script>
 </body>
