@@ -836,6 +836,23 @@
 </style>
 </head>
 <body>
+<div id="mudanza" style="position:fixed;inset:0;z-index:99999;background:#0f0f0f;display:flex;align-items:center;justify-content:center;text-align:center;">
+<div style="max-width:400px;padding:24px;">
+<div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:#FFD600;letter-spacing:2px;margin-bottom:16px;">DESPACHOS SE MUDÓ</div>
+<div style="font-family:'Space Mono',monospace;font-size:12px;color:#aaa;margin-bottom:24px;line-height:1.6;">El módulo de despacho ahora se usa desde el ERP de Maderable.</div>
+<div style="font-family:'Space Mono',monospace;font-size:11px;color:#666;margin-bottom:20px;">Redirigiendo…</div>
+<a id="mudanza-btn" style="display:inline-block;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:#FFD600;color:#000;padding:10px 24px;border-radius:6px;text-decoration:none;cursor:pointer;">IR AHORA</a>
+</div>
+</div>
+<script>
+(function(){
+  var p = new URLSearchParams(location.search).get('proyecto');
+  var dest = 'https://maderable-produccion.vercel.app/despacho.html';
+  if (p) dest += '?p=' + encodeURIComponent(p);
+  document.getElementById('mudanza-btn').href = dest;
+  setTimeout(function(){ location.replace(dest); }, 2000);
+})();
+</script>
 
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <button class="drawer-toggle no-print" id="drawerToggle" onclick="toggleDrawer()">☰ Proyectos</button>
